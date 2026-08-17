@@ -333,3 +333,166 @@ async function run(e) {
 initChart();
 els.form.addEventListener('submit', run);
 run();
+// ============================================
+// NEW FEATURES - Added at the bottom
+// ============================================
+
+// Calculate ATR and SL/TP levels
+function calculateSLTPFromCandles(candles) {
+    if (!candles || candles.length < 15) return null;
+    
+    const atr = calculateATR(candles, 14);
+    const lastCandle = candles[candles.length - 1];
+    const currentPrice = lastCandle.close;
+    
+    const stopLoss = currentPrice - (atr * 1.5);
+    const takeProfit = currentPrice + (atr * 2.5);
+    
+    return {
+        atr: atr,
+        currentPrice: currentPrice,
+        stopLoss: stopLoss,
+        takeProfit: takeProfit,
+        riskRewardRatio: (2.5 / 1.5),
+        riskPercent: ((atr * 1.5) / currentPrice * 100).toFixed(2),
+        rewardPercent: ((atr * 2.5) / currentPrice * 100).toFixed(2)
+    };
+}
+
+// Render SL/TP display
+function renderSLTP(candles) {
+    const levels = calculateSLTPFromCandles(candles);
+    if (!levels) return '';
+    
+    return `
+        <div style="margin-top: 10px; padding: 10px; background: #1a1a2e; border-radius: 6px; font-size: 13px; border: 1px solid #333;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                <div>
+                    <div style="color: #888; font-size: 10px;">🛑 STOP LOSS</div>
+                    <div style="color: #ff4444; font-weight: bold;">${levels.stopLoss.toFixed(5)}</div>
+                    <div style="color: #ff6666; font-size: 11px;">-${levels.riskPercent}%</div>
+                </div>
+                <div>
+                    <div style="color: #888; font-size: 10px;">📊 ENTRY</div>
+                    <div style="color: #fff; font-weight: bold;">${levels.currentPrice.toFixed(5)}</div>
+                    <div style="color: #666; font-size: 10px;">ATR: ${levels.atr.toFixed(5)}</div>
+                </div>
+                <div>
+                    <div style="color: #888; font-size: 10px;">🎯 TAKE PROFIT</div>
+                    <div style="color: #00ff88; font-weight: bold;">${levels.takeProfit.toFixed(5)}</div>
+                    <div style="color: #66ff88; font-size: 11px;">+${levels.rewardPercent}%</div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 6px; color: ${levels.riskRewardRatio >= 2 ? '#00ff88' : '#ffaa00'}; font-weight: bold; font-size: 12px;">
+                📈 Risk/Reward Ratio: ${levels.riskRewardRatio.toFixed(2)}:1
+            </div>
+        </div>
+    `;
+}
+
+// Multi-timeframe signal
+async function getMultiTimeframeSignalEnhanced(apiKey) {
+    if (!apiKey || apiKey === 'FSV8DNHVT1B0D6OK9.') {
+        return {
+            action: '⚠️ Enter API key for multi-timeframe',
+            details: 'Add your Alpha Vantage key above'
+        };
+    }
+    
+    const baseUrl = 'https://www.alphavantage.co/query';
+    
+    try {
+        const dailyRes = await fetch(
+            `${baseUrl}?function=FX_DAILY&from_symbol=EUR&to_symbol=USD&apikey=${apiKey}&outputsize=compact`
+        );
+        const dailyData = await dailyRes.json();
+        
+        const hourlyRes = await fetch(
+            `${baseUrl}?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=60min&apikey=${apiKey}&outputsize=compact`
+        );
+        const hourlyData = await hourlyRes.json();
+        
+        const dailyCandles = parseCandles(dailyData['Time Series FX (Daily)']);
+        const hourlyCandles = parseCandles(hourlyData['Time Series FX (60min)']);
+        
+        if (!dailyCandles || !hourlyCandles || dailyCandles.length < 20) {
+            return {
+                action: '⚠️ Insufficient data',
+                details: 'Need more candles for analysis'
+            };
+        }
+        
+        const dailySignal = calculateSimpleSignal(dailyCandles);
+        const hourlySignal = calculateSimpleSignal(hourlyCandles);
+        
+        if (dailySignal.direction === hourlySignal.direction && dailySignal.direction !== 'NEUTRAL') {
+            return {
+                action: `✅ STRONG ${dailySignal.direction}`,
+                details: `Daily: ${dailySignal.direction} (${dailySignal.confidence}%) | Hourly: ${hourlySignal.direction} (${hourlySignal.confidence}%)`
+            };
+        } else {
+            return {
+                action: '⚠️ WAIT - Timeframes conflict',
+                details: `Daily: ${dailySignal.direction} | Hourly: ${hourlySignal.direction}`
+            };
+        }
+        
+    } catch (error) {
+        return {
+            action: '❌ Error fetching data',
+            details: error.message
+        };
+    }
+}
+
+// Render multi-timeframe
+async function renderMultiTimeframe(apiKey) {
+    const signal = await getMultiTimeframeSignalEnhanced(apiKey);
+    
+    const color = signal.action.includes('STRONG BUY') ? '#00ff88' :
+                  signal.action.includes('STRONG SELL') ? '#ff4444' :
+                  signal.action.includes('WAIT') ? '#ffaa00' : '#888';
+    
+    return `
+        <div style="margin-top: 8px; padding: 10px; background: #1a1a2e; border-radius: 6px; font-size: 12px; border: 1px solid #333;">
+            <div style="color: ${color}; font-weight: bold;">${signal.action}</div>
+            <div style="color: #888; font-size: 11px;">${signal.details}</div>
+        </div>
+    `;
+}
+
+// Backtest results
+function renderBacktest(candles) {
+    if (!candles || candles.length < 50) return '';
+    
+    const results = backtestStrategy(candles, 1000);
+    
+    return `
+        <div style="margin-top: 8px; padding: 10px; background: #1a1a2e; border-radius: 6px; font-size: 12px; border: 1px solid #333;">
+            <div style="color: #888; margin-bottom: 4px;">📊 BACKTEST (Last 100 candles)</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; text-align: center;">
+                <div>
+                    <div style="color: #666; font-size: 10px;">Trades</div>
+                    <div style="color: #fff; font-weight: bold;">${results.trades}</div>
+                </div>
+                <div>
+                    <div style="color: #666; font-size: 10px;">Win Rate</div>
+                    <div style="color: ${parseFloat(results.winRate) > 50 ? '#00ff88' : '#ff4444'}; font-weight: bold;">${results.winRate}</div>
+                </div>
+                <div>
+                    <div style="color: #666; font-size: 10px;">Return</div>
+                    <div style="color: ${parseFloat(results.totalReturn) > 0 ? '#00ff88' : '#ff4444'}; font-weight: bold;">${results.totalReturn}</div>
+                </div>
+                <div>
+                    <div style="color: #666; font-size: 10px;">P/F</div>
+                    <div style="color: ${parseFloat(results.profitFactor) > 1 ? '#00ff88' : '#ff4444'}; font-weight: bold;">${results.profitFactor}</div>
+                </div>
+            </div>
+            <div style="color: #666; font-size: 10px; text-align: center; margin-top: 4px;">
+                Final Balance: $${results.finalBalance} (${results.winners}W / ${results.losers}L)
+            </div>
+        </div>
+    `;
+}
+
+console.log('✅ New features loaded - SL/TP, Multi-timeframe, Backtest');
