@@ -1,0 +1,29 @@
+:root{
+  --bg: #0a0c10;
+  --panel: #12161c;
+  --panel-2: #161b22;
+  --line: #232a34;
+  --ink: #e7e4da;
+  --muted: #7c8695;
+  --amber: #e8a33d;
+  --up: #3fb950;
+  --down: #f0524d;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+}
+
+*{ box-sizing: border-box; }
+html{ background: var(--bg); }
+body{
+  margin:0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
