@@ -277,9 +277,15 @@ function renderGauge(direction, confidence) {
 }
 
 function renderPrintout(lines) {
-  els.printout.innerHTML = lines.map(l =>
-    `<p class="printout-line"><span class="tag">${l.tag}</span><span class="val ${l.cls}">${l.val}</span></p>`
-  ).join('');
+    els.printout.innerHTML = lines.map(l => `<p class="printout-line"><span class="tag">${l.tag}</span><span class="val ${l.cls}">${l.val}</span></p>`.replace(/\n/g, '<br />')).join('');
+    
+    if (window.candles && window.candles.length > 0) {
+        const sltpHTML = renderSLTP(window.candles);
+        if (els.printout) {
+            els.printout.innerHTML += sltpHTML;
+        }
+    }
+}
 }
 
 function renderTape(pair, candles) {
@@ -313,6 +319,12 @@ async function run(e) {
     chart.timeScale().fitContent();
 
     const signal = buildSignal(candles);
+
+// === NEW FEATURES ===
+window.candles = candles;
+const mtfHTML = await renderMultiTimeframe(els.apiKey.value.trim());
+const backtestHTML = renderBacktest(candles);
+if (els.printout) els.printout.innerHTML += mtfHTML + backtestHTML;
     renderGauge(signal.direction, signal.confidence);
     renderPrintout(signal.lines);
     renderTape(pair, candles);
